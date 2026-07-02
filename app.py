@@ -207,32 +207,34 @@ PARAMETROS = {
 ORDEN_MODELO = ["pH", "CE", "T", "OD", "DBO", "CT", "AyG", "ArT", "PbT", "CuT", "MnT", "Ca", "Mg", "Dureza"]
 
 # ──────────────────────────────────────────────────────────────────────────
-# 4. CARGA DEL MODELO DESDE GOOGLE DRIVE (Para archivos > 25MB)
+# 4. CARGA DEL MODELO DESDE GOOGLE DRIVE (Blindado contra archivos corruptos)
 # ──────────────────────────────────────────────────────────────────────────
-import urllib.request
 import os
 
 @st.cache_resource(show_spinner=False)
 def cargar_pipeline():
     ruta_local = "modelo_agua.pkl"
+    ID_DRIVE = "1hJ06f5McpF-T1PaKz0xbBMgeZ5BEUgNN"
+    url = f"https://drive.google.com/uc?export=download&confirm=t&id={ID_DRIVE}"
     
-    # SI EL ARCHIVO NO EXISTE EN EL SERVIDOR, LO DESCARGA DE GOOGLE DRIVE
-    if not os.path.exists(ruta_local):
-        with st.spinner("Descargando el modelo predictivo desde el servidor de almacenamiento... Esto solo toma unos segundos."):
-            ID_DRIVE = "1hJ06f5McpF-T1PaKz0xbBMgeZ5BEUgNN" 
-            # URL MODIFICADA: Incluye el comando &confirm=t para saltar la advertencia de archivos grandes de Google
-            url = f"https://drive.google.com/uc?export=download&confirm=t&id={ID_DRIVE}"
+    # Si el archivo no existe, o si existe pero pesa 0 bytes, se fuerza la descarga limpia
+    if not os.path.exists(ruta_local) or os.path.getsize(ruta_local) == 0:
+        with st.spinner("Descargando el modelo predictivo real... Esto toma unos segundos."):
+            if os.path.exists(ruta_local):
+                os.remove(ruta_local)
             
-            # Configuramos un agente de navegación simulado para que Google no bloquee la petición
-            opener = urllib.request.build_opener()
-            opener.addheaders = [('User-agent', 'Mozilla/5.0')]
-            urllib.request.install_opener(opener)
+            # Forzamos la descarga usando curl (evita bloqueos 403)
+            os.system(f'curl -L "{url}" -o {ruta_local}')
             
-            urllib.request.urlretrieve(url, ruta_local)
-            
-    pipeline = joblib.load(ruta_local)
-    return pipeline
-
+    # Intentamos cargar el pipeline de forma segura
+    try:
+        pipeline = joblib.load(ruta_local)
+        return pipeline
+    except Exception as e:
+        # Si falla (por ejemplo, descarga incompleta), borramos el archivo para que reintente en la próxima carga
+        if os.path.exists(ruta_local):
+            os.remove(ruta_local)
+        raise e
 
 modelo_disponible = True
 try:
@@ -242,6 +244,7 @@ try:
 except Exception as e:
     modelo_disponible = False
     pipeline, imputador, clasificador = None, None, None
+    st.error(f"Error al inicializar el modelo predictivo: {e}. Por favor, recarga la página.")
 
 # ──────────────────────────────────────────────────────────────────────────
 # 5. BARRA LATERAL
