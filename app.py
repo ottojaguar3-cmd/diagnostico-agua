@@ -219,9 +219,15 @@ def cargar_pipeline():
     # SI EL ARCHIVO NO EXISTE EN EL SERVIDOR, LO DESCARGA DE GOOGLE DRIVE
     if not os.path.exists(ruta_local):
         with st.spinner("Descargando el modelo predictivo desde el servidor de almacenamiento... Esto solo toma unos segundos."):
-            # REEMPLAZA LAS XX POR EL ID DE TU ARCHIVO DE GOOGLE DRIVE
             ID_DRIVE = "1hJ06f5McpF-T1PaKz0xbBMgeZ5BEUgNN" 
-            url = f"https://docs.google.com/uc?export=download&id={ID_DRIVE}"
+            # URL MODIFICADA: Incluye el comando &confirm=t para saltar la advertencia de archivos grandes de Google
+            url = f"https://drive.google.com/uc?export=download&confirm=t&id={ID_DRIVE}"
+            
+            # Configuramos un agente de navegación simulado para que Google no bloquee la petición
+            opener = urllib.request.build_opener()
+            opener.addheaders = [('User-agent', 'Mozilla/5.0')]
+            urllib.request.install_opener(opener)
+            
             urllib.request.urlretrieve(url, ruta_local)
             
     pipeline = joblib.load(ruta_local)
